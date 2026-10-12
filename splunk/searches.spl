@@ -1,0 +1,57 @@
+# =====================================================================
+# Mini-SOC  SPL searches   (index=soc_lab, sourcetype=soc:alert)
+# Create the index first: Settings > Indexes > New Index > soc_lab
+# =====================================================================
+
+# --- 1. Overview: alerts by type and severity -------------------------
+index=soc_lab sourcetype=soc:alert
+| stats count by alert_type, severity
+| sort - count
+
+# --- 2. Alert timeline ------------------------------------------------
+index=soc_lab sourcetype=soc:alert
+| timechart span=1m count by alert_type
+
+# --- 3. Top attacking source IPs --------------------------------------
+index=soc_lab sourcetype=soc:alert
+| stats count AS alerts, dc(alert_type) AS techniques, values(alert_type) AS types by src_ip
+| sort - alerts
+
+# --- 4. MITRE ATT&CK coverage table ----------------------------------
+index=soc_lab sourcetype=soc:alert
+| stats count, earliest(timestamp) AS first_seen, latest(timestamp) AS last_seen
+        by mitre_technique, mitre_name
+| sort mitre_technique
+
+# --- 5. Multi-stage attack correlation --------------------------------
+# One source doing recon (T1046) AND credential attack (T1110) = escalate.
+index=soc_lab sourcetype=soc:alert (alert_type=port_scan OR alert_type=brute_force)
+| stats dc(alert_type) AS stages, values(alert_type) AS stage_names,
+        min(first_seen) AS start, max(last_seen) AS end by src_ip
+| where stages >= 2
+| eval duration_s = round(end - start, 1)
+| eval risk = "CRITICAL: recon followed by brute force"
+
+# --- 6. Beacon detail: which hosts phone home, how regularly ---------
+index=soc_lab sourcetype=soc:alert alert_type=beaconing
+| table timestamp src_ip dst_ip evidence.dport evidence.mean_interval_s evidence.cv evidence.connections
+
+# --- 7. DNS tunneling detail -----------------------------------------
+index=soc_lab sourcetype=soc:alert alert_type=dns_tunnel
+| table timestamp src_ip evidence.base_domain evidence.suspicious_queries evidence.avg_entropy
+
+# --- 8. Threat hunt: raw-log hypothesis (needs Zeek/Suricata ingest) -
+# Hypothesis: a host making DNS queries with very long names is exfiltrating data.
+# index=zeek sourcetype=zeek_dns
+# | eval qlen = len(query)
+# | where qlen > 50
+# | stats count, avg(qlen) AS avg_len, dc(query) AS unique_names by id.orig_h
+# | where count > 10
+# | sort - count
+
+# --- 9. Hunt: failed SSH logins (needs /var/log/auth.log forwarded) --
+# index=linux sourcetype=linux_secure "Failed password"
+# | rex "from (?<src>\d+\.\d+\.\d+\.\d+)"
+# | stats count by src
+# | where count > 10
+# | sort - count

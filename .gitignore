@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+captures/
+*.log
+/alerts.jsonl
+/portscan.pcapng
+/portscan_scan.pcapng
+splunk/dashboard_files/

@@ -1,0 +1,19 @@
+# Local Splunk for the lab. Change the password and token before using on anything shared.
+#   docker compose -f splunk/docker-compose.yml up -d
+# UI: http://localhost:8000 (admin / the password below)   HEC: https://localhost:8088
+services:
+  splunk:
+    image: splunk/splunk:latest
+    container_name: mini-soc-splunk
+    environment:
+      SPLUNK_START_ARGS: "--accept-license"
+      SPLUNK_GENERAL_TERMS: "--accept-sgt-current-at-splunk-com"
+      SPLUNK_PASSWORD: "ChangeMe-Lab-123!"
+      SPLUNK_HEC_TOKEN: "11111111-2222-3333-4444-555555555555"
+    ports:
+      - "8000:8000"
+      - "8088:8088"
+    volumes:
+      - splunk-var:/opt/splunk/var
+volumes:
+  splunk-var:
